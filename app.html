@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ThrowFit - Projector throw distance</title>
+<style>
+  * { box-sizing:border-box; margin:0; padding:0; }
+  body { font-family:-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif; background:#101822; color:#e8eef6; line-height:1.5; }
+  .wrap { max-width:640px; margin:0 auto; padding:26px 18px 60px; }
+  a { color:#ffb347; } h1 { font-size:28px; } h1 span { color:#ffb347; } .sub { color:#9fb0c4; margin:4px 0 18px; }
+  .card { background:#1b2736; border-radius:14px; padding:16px; margin-bottom:14px; }
+  label { display:block; font-size:13px; color:#9fb0c4; margin:10px 0 4px; }
+  input, select { width:100%; padding:11px; border-radius:9px; border:1px solid #33465c; background:#101822; color:#e8eef6; font-size:16px; }
+  .row { display:flex; gap:10px; } .row > div { flex:1; }
+  .seg { display:flex; gap:8px; } .seg button { flex:1; padding:10px; border-radius:9px; border:1px solid #33465c; background:#101822; color:#9fb0c4; font-size:14px; cursor:pointer; } .seg button.on { background:#ffb347; color:#101822; font-weight:700; border-color:#ffb347; }
+  .big { font-size:40px; font-weight:800; color:#ffb347; } .lbl { font-size:13px; color:#9fb0c4; }
+  .grid { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:12px; } .grid b { display:block; font-size:20px; }
+  .note { font-size:14px; color:#cdd8e6; margin-top:10px; } h2 { font-size:17px; margin-bottom:8px; } .small { font-size:13px; color:#9fb0c4; }
+  .warn { background:#3d2a20; border:1px solid #b9703f; color:#ffddc4; padding:12px; border-radius:10px; margin-top:12px; font-size:14px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Throw<span>Fit</span></h1>
+  <div class="sub">How far back does the projector go for the screen you want, or how big a screen fits your room?</div>
+  <div class="card">
+    <div class="seg" id="mode"><button data-v="dist" class="on">Screen size &rarr; distance</button><button data-v="size">Distance &rarr; screen size</button></div>
+    <div class="row"><div><label for="a">Aspect ratio</label><select id="a"><option>16:9</option><option>16:10</option><option>4:3</option><option>21:9</option></select></div><div><label for="u">Units</label><select id="u"><option value="in">inches / feet</option><option value="cm">cm / metres</option></select></div></div>
+    <div id="distui"><label for="diag" id="diaglbl">Screen diagonal (in)</label><input id="diag" type="number" min="10" step="1" value="100"></div>
+    <div id="sizeui" style="display:none"><label for="dist" id="distlbl">Distance to screen (ft)</label><input id="dist" type="number" min="1" step="0.1" value="10"></div>
+    <div class="row"><div><label for="lo">Throw ratio (min)</label><input id="lo" type="number" min="0.1" step="0.01" value="1.13"></div><div><label for="hi">Throw ratio (max, zoom lens)</label><input id="hi" type="number" min="0.1" step="0.01" placeholder="same as min"></div></div>
+  </div>
+  <div class="card" id="out"></div>
+  <div class="card"><h2>About this</h2><div class="small">Throw ratio = throw distance &divide; image width, and it uses the image width, not the diagonal. Width comes from the diagonal and aspect ratio. Distance is measured from the lens, and projectors with a zoom lens list a range, like 1.4 to 2.2. Matches the <a href="https://www.benq.com/en-us/knowledge-center/knowledge/projector-installation-calculator.html">BenQ</a> example: 1.13 throw ratio, 100 inch 16:9 image (about 7.2 ft wide) needs about 8.2 ft. Check your model's spec sheet; lens shift and keystone limits are not modelled, and spec ratios are nominal. <a href="index.html">About</a></div></div>
+</div>
+<script src="engine.js"></script>
+<script>
+var $ = function (i) { return document.getElementById(i); }, mode = 'dist';
+Array.prototype.forEach.call($('mode').querySelectorAll('button'), function (b) { b.onclick = function () { Array.prototype.forEach.call($('mode').querySelectorAll('button'), function (x) { x.className = ''; }); b.className = 'on'; mode = b.getAttribute('data-v'); $('distui').style.display = mode === 'dist' ? '' : 'none'; $('sizeui').style.display = mode === 'size' ? '' : 'none'; render(); }; });
+function render() {
+  var m = $('u').value === 'cm', ab = $('a').value.split(':').map(Number), a = ab[0], b = ab[1], lo = parseFloat($('lo').value), hi = parseFloat($('hi').value);
+  $('diaglbl').textContent = 'Screen diagonal (' + (m ? 'cm' : 'in') + ')'; $('distlbl').textContent = 'Distance to screen (' + (m ? 'm' : 'ft') + ')';
+  if (!(lo > 0)) { $('out').innerHTML = '<div class="lbl">Enter the throw ratio from the spec sheet.</div>'; return; }
+  if (!(hi >= lo)) hi = lo;
+  var f = function (x) { return x.toFixed(m ? 2 : 1); }, h;
+  if (mode === 'dist') {
+    var d = parseFloat($('diag').value); if (!(d > 0)) { $('out').innerHTML = '<div class="lbl">Enter a screen size.</div>'; return; }
+    var w = Throw.width(d, a, b), ht = Throw.height(d, a, b), r = Throw.range(lo, hi, w), div = m ? 100 : 12, unit = m ? ' m' : ' ft';
+    h = '<div class="lbl">Place the projector lens</div><div class="big" id="dist-out">' + (hi > lo ? f(r[0] / div) + ' to ' + f(r[1] / div) : f(r[0] / div)) + unit + '</div><div class="lbl">from the screen (' + Throw.classify(lo).toLowerCase() + ')</div>';
+    h += '<div class="grid"><div><span class="lbl">Image width</span><b id="w-out">' + f(w / (m ? 1 : 1)) + (m ? ' cm' : ' in') + '</b></div><div><span class="lbl">Image height</span><b>' + f(ht) + (m ? ' cm' : ' in') + '</b></div></div>';
+  } else {
+    var D = parseFloat($('dist').value); if (!(D > 0)) { $('out').innerHTML = '<div class="lbl">Enter a distance.</div>'; return; }
+    var dd = D * (m ? 100 : 12), wmax = Throw.maxWidth(dd, lo), wmin = Throw.maxWidth(dd, hi), dg = [Throw.diagFromWidth(wmin, a, b), Throw.diagFromWidth(wmax, a, b)];
+    h = '<div class="lbl">Screen you can fill from ' + D + (m ? ' m' : ' ft') + '</div><div class="big" id="size-out">' + (hi > lo ? Math.round(dg[0]) + ' to ' + Math.round(dg[1]) : Math.round(dg[1])) + (m ? ' cm' : ' in') + '</div><div class="lbl">diagonal, ' + $('a').value + ' (' + Throw.classify(lo).toLowerCase() + ')</div>';
+    h += '<div class="grid"><div><span class="lbl">Widest image</span><b>' + f(wmax) + (m ? ' cm' : ' in') + '</b></div><div><span class="lbl">Narrowest image</span><b>' + f(wmin) + (m ? ' cm' : ' in') + '</b></div></div>';
+  }
+  $('out').innerHTML = h + '<div class="note">Distance is lens to screen. Leave a bit of room for the projector body and fan clearance.</div>';
+}
+['a', 'u', 'diag', 'dist', 'lo', 'hi'].forEach(function (i) { $(i).oninput = render; $(i).onchange = render; });
+render();
+</script>
+</body>
+</html>
